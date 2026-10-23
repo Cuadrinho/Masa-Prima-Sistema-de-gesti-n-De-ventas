@@ -125,32 +125,8 @@ Se configuran en [`config/tienda.php`](config/tienda.php):
 
 ## Modelo de datos
 
-```mermaid
-erDiagram
-    users ||--o| customers : "tiene un comercio"
-    customers ||--o{ orders : realiza
-    orders ||--|{ order_items : contiene
-    products ||--o{ order_items : "se pide en"
-    orders ||--o{ order_events : registra
+<img width="751" height="529" alt="image" src="https://github.com/user-attachments/assets/5e255f4c-67cf-458b-a826-736c13138cdb" />
 
-    users { string name string email string rol }
-    customers { string razon_social string cuit string condicion_iva int cuenta_corriente_dias }
-    products { string codigo string nombre string categoria decimal precio bool activo }
-    orders { string estado date entrega_fecha string franja string metodo_pago string nivel decimal total }
-    order_items { int cajas decimal precio_unitario bool listo }
-    order_events { string autor string descripcion }
-```
-
-| Tabla | Descripción |
-|---|---|
-| `users` | Cuentas de acceso, con `rol`: `admin`, `cocina` o `cliente`. |
-| `customers` | Comercios: razón social, CUIT, tipo de comercio, localidad, WhatsApp, condición de IVA y días de cuenta corriente. |
-| `products` | Catálogo: código, nombre, categoría, foto, unidades por caja, precio, activo y orden. |
-| `orders` | Pedidos: estado, entrega (tipo, fecha, franja, dirección, camión), pago, nivel, importes y fechas de cada estado. |
-| `order_items` | Líneas del pedido en cajas, con marca de "listo" para la cocina. |
-| `order_events` | Historial de actividad de cada pedido. |
-
-Además, en [`database/sql/masaprima.sql`](database/sql/masaprima.sql) hay un **esquema PostgreSQL normalizado (1FN, 2FN, 3FN)** de referencia, con tablas de catálogo (localidades, condiciones de IVA, franjas, formas de pago, estados), direcciones de entrega, niveles de precio, camiones, repartos, historial de estados, pagos y comprobantes.
 
 ---
 
