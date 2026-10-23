@@ -1,0 +1,117 @@
+@import 'tailwindcss';
+@import '../../vendor/livewire/flux/dist/flux.css';
+
+@source '../views';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../vendor/livewire/flux-pro/stubs/**/*.blade.php';
+@source '../../vendor/livewire/flux/stubs/**/*.blade.php';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --color-zinc-50: #fafafa;
+    --color-zinc-100: #f5f5f5;
+    --color-zinc-200: #e5e5e5;
+    --color-zinc-300: #d4d4d4;
+    --color-zinc-400: #a3a3a3;
+    --color-zinc-500: #737373;
+    --color-zinc-600: #525252;
+    --color-zinc-700: #404040;
+    --color-zinc-800: #262626;
+    --color-zinc-900: #171717;
+    --color-zinc-950: #0a0a0a;
+
+    --color-accent: var(--color-neutral-800);
+    --color-accent-content: var(--color-neutral-800);
+    --color-accent-foreground: var(--color-white);
+
+    /* Tienda */
+    --font-display: 'Anton', 'Impact', 'Arial Narrow', sans-serif;
+    --font-body: 'Work Sans', ui-sans-serif, system-ui, sans-serif;
+
+    --color-tomate: #c3311b;
+    --color-tomate-oscuro: #a2271a;
+    --color-queso: #f2b705;
+    --color-carbon: #1e1a17;
+    --color-carbon-suave: #2a2521;
+    --color-harina: #f3efe8;
+    --color-hielo: #e3ecf2;
+    --color-albahaca: #2f7d32;
+    --color-carton: #d9ba8c;
+    --color-linea: #e5e1da;
+    --color-tinta: #57514b;
+    --color-arena: #ece6dc;
+    --color-queso-claro: #fdf1cc;
+    --color-tomate-claro: #fbe1dc;
+    --color-albahaca-claro: #e3f0e0;
+}
+
+@layer theme {
+    .dark {
+        --color-accent: var(--color-white);
+        --color-accent-content: var(--color-white);
+        --color-accent-foreground: var(--color-neutral-800);
+    }
+}
+
+@layer base {
+
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--color-gray-200, currentColor);
+    }
+}
+
+[data-flux-field]:not(ui-radio, ui-checkbox) {
+    @apply grid gap-2;
+}
+
+[data-flux-label] {
+    @apply  !mb-0 !leading-tight;
+}
+
+input:focus[data-flux-control],
+textarea:focus[data-flux-control],
+select:focus[data-flux-control] {
+    @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
+}
+
+/* \[:where(&)\]:size-4 {
+    @apply size-4;
+} */
+
+/* Tienda: piezas reutilizables */
+@layer components {
+    .tienda-label {
+        @apply mb-1.5 block text-xs font-semibold text-carbon;
+    }
+
+    .tienda-input {
+        @apply w-full rounded-md border border-linea bg-white px-3 py-2.5 text-sm text-carbon placeholder:text-tinta/60 focus:border-carbon focus:outline-none focus:ring-2 focus:ring-carbon/10;
+    }
+
+    .tienda-btn {
+        @apply inline-flex items-center justify-center gap-2 rounded-md px-5 py-3 text-sm font-semibold transition;
+    }
+
+    .tienda-btn-primario {
+        @apply inline-flex items-center justify-center gap-2 rounded-md px-5 py-3 text-sm font-semibold transition bg-tomate text-white hover:bg-tomate-oscuro;
+    }
+
+    .tienda-btn-borde {
+        @apply inline-flex items-center justify-center gap-2 rounded-md px-5 py-3 text-sm font-semibold transition border-[1.5px] border-carbon bg-white text-carbon hover:bg-harina;
+    }
+
+    .tienda-btn-oscuro {
+        @apply inline-flex items-center justify-center gap-2 rounded-md px-5 py-3 text-sm font-semibold transition bg-carbon text-white hover:bg-carbon-suave;
+    }
+}
+
+[x-cloak] {
+    display: none !important;
+}
