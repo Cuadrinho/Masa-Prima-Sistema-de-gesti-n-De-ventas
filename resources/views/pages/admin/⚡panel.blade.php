@@ -113,7 +113,7 @@ new #[Layout('layouts::admin', ['migas' => ['Panel general']])] #[Title('Panel g
         <x-admin.kpi titulo="Pedidos activos" :valor="$activos" :detalle="$this->solicitudes->count().' solicitudes nuevas para aprobar'" />
         <x-admin.kpi titulo="Cajas a producir hoy" :valor="$this->aProducir->sum('cajas')" :detalle="$this->comandasEnCocina.' comandas en cocina'" destacado />
         <x-admin.kpi titulo="Por entregar hoy" :valor="$this->entregasDeHoy->where('estado', '!=', EstadoPedido::Entregado)->count()" :detalle="$enReparto.' '.($enReparto === 1 ? 'camión' : 'camiones').' en reparto'" />
-        <x-admin.kpi titulo="Por cobrar" :valor="Formato::dinero($montoPorCobrar, 'MONTO')" :detalle="$this->porCobrar->count().' pedidos · '.$vencidos->count().' '.($vencidos->count() === 1 ? 'vencido' : 'vencidos')" />
+        <x-admin.kpi titulo="Por cobrar" :valor="Formato::dinero($montoPorCobrar)" :detalle="$this->porCobrar->count().' pedidos · '.$vencidos->count().' '.($vencidos->count() === 1 ? 'vencido' : 'vencidos')" />
         <x-admin.kpi titulo="Finalizados · semana" :valor="$this->circuito[EstadoPedido::Finalizado->value]['pedidos']" detalle="entregados y cobrados" />
     </div>
 

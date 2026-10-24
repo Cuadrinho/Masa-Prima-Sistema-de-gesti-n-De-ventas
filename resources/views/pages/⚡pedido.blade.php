@@ -1,13 +1,16 @@
 <?php
 
+use App\Enums\EstadoCliente;
 use App\Enums\EstadoPedido;
 use App\Enums\Franja;
 use App\Enums\MetodoPago;
 use App\Models\Customer;
 use App\Models\Order;
+use App\Models\PriceList;
 use App\Models\Product;
 use App\Rules\Cuit;
 use App\Support\Formato;
+use App\Support\Niveles;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -82,7 +85,24 @@ new #[Layout('layouts::tienda')] #[Title('Confirmá tu pedido')] class extends C
     #[Computed]
     public function productos(): Collection
     {
-        return Product::activos()->whereIn('codigo', array_keys($this->carrito))->get()->keyBy('codigo');
+        return Product::activos()->where('se_puede_pedir', true)->whereIn('codigo', array_keys($this->carrito))->get()->keyBy('codigo');
+    }
+
+    /**
+     * @return array<int, array<string, string>>
+     */
+    #[Computed]
+    public function precios(): array
+    {
+        return PriceList::mapaVigente();
+    }
+
+    /**
+     * Precio por caja del producto en el nivel del pedido.
+     */
+    public function precio(Product $producto): ?string
+    {
+        return $this->precios[$producto->id][Niveles::clave($this->nivel)] ?? null;
     }
 
     #[Computed]
@@ -104,7 +124,35 @@ new #[Layout('layouts::tienda')] #[Title('Confirmá tu pedido')] class extends C
     #[Computed]
     public function nivel(): string
     {
-        return Order::nivelPara($this->cajas);
+        return Order::nivelPara($this->cajas, $this->cliente);
+    }
+
+    /**
+     * Productos del carrito que no tienen precio en la lista vigente.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function sinPrecio(): array
+    {
+        return collect($this->items)
+            ->reject(fn (array $item) => Niveles::completos($this->precios[$item['producto']->id] ?? []))
+            ->map(fn (array $item) => $item['producto']->nombre)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array{subtotal: float, descuento: float, envio: float, iva: float, total: float}|null
+     */
+    #[Computed]
+    public function totales(): ?array
+    {
+        return Order::calcularTotales(
+            collect($this->items)->map(fn (array $item) => ['precios' => $this->precios[$item['producto']->id] ?? [], 'cajas' => $item['cantidad']]),
+            Niveles::clave($this->nivel),
+            $this->entrega === 'reparto',
+        );
     }
 
     /**
@@ -133,6 +181,12 @@ new #[Layout('layouts::tienda')] #[Title('Confirmá tu pedido')] class extends C
     {
         if ($this->cajas < config('tienda.pedido_minimo')) {
             $this->redirectRoute('catalogo', navigate: true);
+
+            return;
+        }
+
+        if ($this->sinPrecio !== []) {
+            $this->addError('carrito', 'Sin precio: '.implode(', ', $this->sinPrecio).'.');
 
             return;
         }
@@ -174,6 +228,11 @@ new #[Layout('layouts::tienda')] #[Title('Confirmá tu pedido')] class extends C
                 'cuit' => Cuit::normalizar($this->cuit),
                 'condicion_iva' => $this->condicionIva,
                 'email' => auth()->user()->email,
+                'direccion' => $this->entrega === 'reparto' ? $this->direccion : null,
+                'franja' => $this->franja,
+                'metodo_pago' => $this->pago,
+                'estado' => EstadoCliente::Pendiente,
+                'nota_alta' => "Se registró con su primer pedido de {$this->cajas} cajas. Falta revisar CUIT y zona de reparto.",
             ]);
 
             $order = $cliente->orders()->create([
@@ -185,13 +244,14 @@ new #[Layout('layouts::tienda')] #[Title('Confirmá tu pedido')] class extends C
                 'indicaciones' => $this->indicaciones ?: null,
                 'metodo_pago' => $this->pago,
                 'nivel' => $this->nivel,
+                ...$this->totales,
             ]);
 
             foreach ($this->items as $item) {
                 $order->items()->create([
                     'product_id' => $item['producto']->id,
                     'cajas' => $item['cantidad'],
-                    'precio_unitario' => $item['producto']->precio,
+                    'precio_unitario' => $this->precio($item['producto']),
                 ]);
             }
 
@@ -304,8 +364,8 @@ new #[Layout('layouts::tienda')] #[Title('Confirmá tu pedido')] class extends C
                     <h2 class="font-bold">Entrega</h2>
                     <div class="mt-4 grid gap-3 sm:grid-cols-2">
                         @foreach ([
-                            'reparto' => ['Reparto a domicilio', 'Camión refrigerado · costo [A CALCULAR]'],
-                            'retiro' => ['Retiro por fábrica', '[DIRECCIÓN] · sin cargo'],
+                            'reparto' => ['Reparto a domicilio', 'Camión refrigerado · '.(config('tienda.envio') ? Formato::dinero(config('tienda.envio')) : 'sin cargo')],
+                            'retiro' => ['Retiro por fábrica', ucfirst(collect([config('tienda.empresa.direccion'), 'sin cargo'])->filter()->implode(' · '))],
                         ] as $valor => [$titulo, $detalle])
                             <label @class([
                                 'flex cursor-pointer items-start gap-3 rounded-xl p-4 transition',
@@ -325,7 +385,7 @@ new #[Layout('layouts::tienda')] #[Title('Confirmá tu pedido')] class extends C
                         @if ($entrega === 'reparto')
                             <div class="sm:col-span-2">
                                 <label for="direccion" class="tienda-label">Dirección de entrega</label>
-                                <input id="direccion" wire:model="direccion" class="tienda-input" placeholder="Av. [CALLE] 1234">
+                                <input id="direccion" wire:model="direccion" class="tienda-input" placeholder="Calle, número y localidad">
                                 @error('direccion') <p class="mt-1 text-xs text-tomate">{{ $message }}</p> @enderror
                             </div>
                         @endif
@@ -362,7 +422,7 @@ new #[Layout('layouts::tienda')] #[Title('Confirmá tu pedido')] class extends C
                         @foreach ([
                             'transferencia' => ['Transferencia', 'CBU / alias al confirmar'],
                             'mercadopago' => ['Mercado Pago', 'Link de pago'],
-                            'cuenta_corriente' => ['Cuenta corriente', 'Clientes aprobados · [X] días'],
+                            'cuenta_corriente' => ['Cuenta corriente', 'Clientes aprobados · '.($this->cliente?->cuenta_corriente_dias ?? config('tienda.cuenta_corriente_dias')).' días'],
                         ] as $valor => [$titulo, $detalle])
                             <label @class([
                                 'flex cursor-pointer items-start gap-3 rounded-xl p-4 transition',
@@ -393,7 +453,8 @@ new #[Layout('layouts::tienda')] #[Title('Confirmá tu pedido')] class extends C
                         @foreach ($this->items as $item)
                             <li class="flex justify-between gap-3 py-2.5">
                                 <span>{{ $item['cantidad'] }} × {{ $item['producto']->nombre }}</span>
-                                <span class="shrink-0">{{ Formato::dinero($item['producto']->precio === null ? null : $item['producto']->precio * $item['cantidad'], 'IMPORTE') }}</span>
+                                @php($precio = $this->precio($item['producto']))
+                                <span class="shrink-0">{{ Formato::dinero($precio === null ? null : $precio * $item['cantidad']) }}</span>
                             </li>
                         @endforeach
                     </ul>
@@ -401,17 +462,24 @@ new #[Layout('layouts::tienda')] #[Title('Confirmá tu pedido')] class extends C
                     <p class="mt-2 rounded-lg bg-harina px-3 py-2 text-xs font-semibold">{{ $this->cajas }} cajas · Nivel {{ $this->nivel }} aplicado</p>
 
                     <dl class="mt-4 space-y-1.5 text-sm">
-                        <div class="flex justify-between"><dt>Subtotal de lista</dt><dd>$ [SUBTOTAL]</dd></div>
-                        <div class="flex justify-between font-semibold text-albahaca"><dt>Descuento {{ $this->nivel }}</dt><dd>− $ [DESCUENTO]</dd></div>
-                        <div class="flex justify-between"><dt>Envío</dt><dd>{{ $entrega === 'retiro' ? 'Sin cargo' : '$ [ENVÍO]' }}</dd></div>
-                        <div class="flex justify-between"><dt>IVA</dt><dd>$ [IVA]</dd></div>
+                        <div class="flex justify-between"><dt>Subtotal de lista</dt><dd>{{ Formato::dinero($this->totales['subtotal'] ?? null) }}</dd></div>
+                        <div class="flex justify-between font-semibold text-albahaca"><dt>Descuento {{ $this->nivel }}</dt><dd>− {{ Formato::dinero($this->totales['descuento'] ?? null) }}</dd></div>
+                        <div class="flex justify-between"><dt>Envío</dt><dd>{{ ($this->totales['envio'] ?? 0) == 0 ? 'Sin cargo' : Formato::dinero($this->totales['envio']) }}</dd></div>
+                        <div class="flex justify-between"><dt>IVA ({{ config('tienda.iva') * 100 }} %)</dt><dd>{{ Formato::dinero($this->totales['iva'] ?? null) }}</dd></div>
                     </dl>
                     <div class="mt-3 flex items-end justify-between border-t-2 border-carbon pt-3">
                         <span class="text-sm font-bold">Total</span>
-                        <span class="font-display text-3xl">$ [TOTAL]</span>
+                        <span class="font-display text-3xl">{{ Formato::dinero($this->totales['total'] ?? null) }}</span>
                     </div>
 
-                    <button type="submit" class="tienda-btn-primario mt-4 w-full" wire:loading.attr="disabled">
+                    @if ($this->sinPrecio)
+                        <div class="mt-4 rounded-lg border border-tomate bg-white px-3 py-2.5 text-xs text-tomate" role="alert">
+                            <p class="font-bold">Todavía no tenemos precio para {{ implode(', ', $this->sinPrecio) }}.</p>
+                            <p class="mt-1">Quitalo del pedido o escribinos por WhatsApp para consultarlo.</p>
+                        </div>
+                    @endif
+
+                    <button type="submit" class="tienda-btn-primario mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50" wire:loading.attr="disabled" @disabled($this->sinPrecio)>
                         <span wire:loading.remove wire:target="confirmar">Confirmar pedido</span>
                         <span wire:loading wire:target="confirmar">Enviando…</span>
                     </button>

@@ -1,7 +1,7 @@
 <x-layouts::tienda>
     {{-- Barra superior --}}
     <div class="bg-queso px-4 py-2 text-center text-xs font-semibold text-carbon">
-        Venta exclusiva a comercios · Pedido mínimo {{ config('tienda.pedido_minimo') }} cajas · Envíos a [La Matanza]
+        Venta exclusiva a comercios · Pedido mínimo {{ config('tienda.pedido_minimo') }} cajas @if (config('tienda.zona_reparto')) · Envíos a {{ config('tienda.zona_reparto') }} @endif
     </div>
 
     {{-- Encabezado --}}
@@ -45,7 +45,7 @@
             <dl class="mt-8 flex flex-wrap gap-x-8 gap-y-4 border-t border-linea pt-4">
                 <div>
                     <dt class="sr-only">Variedades</dt>
-                    <dd class="font-display text-3xl">9</dd>
+                    <dd class="font-display text-3xl">{{ \App\Models\Product::activos()->count() }}</dd>
                     <dd class="text-xs text-tinta">variedades</dd>
                 </div>
                 <div>
@@ -53,20 +53,30 @@
                     <dd class="font-display text-3xl">{{ config('tienda.pedido_minimo') }} cajas</dd>
                     <dd class="text-xs text-tinta">pedido mínimo</dd>
                 </div>
-                <div>
-                    <dt class="sr-only">Entrega</dt>
-                    <dd class="font-display text-3xl">[X] h</dd>
-                    <dd class="text-xs text-tinta">entrega en tu local</dd>
-                </div>
+                @if (config('tienda.entrega_horas'))
+                    <div>
+                        <dt class="sr-only">Entrega</dt>
+                        <dd class="font-display text-3xl">{{ config('tienda.entrega_horas') }} h</dd>
+                        <dd class="text-xs text-tinta">entrega en tu local</dd>
+                    </div>
+                @endif
             </dl>
         </div>
 
+        @php($destacado = \App\Models\Product::activos()->whereNotNull('imagen')->first())
         <div class="relative aspect-square overflow-hidden rounded-3xl bg-tomate">
-            <div class="absolute inset-x-0 bottom-0 h-[26%] bg-tomate-oscuro"></div>
-            <div class="absolute inset-x-[12%] bottom-[14%] h-[20%] rounded-md bg-carton"></div>
-            <x-tienda.pizza variante="especial" class="absolute left-1/2 top-[9%] w-[66%] -translate-x-1/2 drop-shadow-xl" />
-            <span class="absolute right-5 top-5 rounded-full bg-queso px-3.5 py-1.5 text-xs font-bold">Caja x [N] unidades</span>
-            <p class="absolute bottom-5 left-5 font-display text-2xl uppercase text-white">[Foto de producto]</p>
+            @if ($destacado)
+                <img src="{{ asset($destacado->imagen) }}" alt="{{ $destacado->nombre }}" class="absolute inset-0 size-full object-cover">
+                <div class="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-carbon/80 to-transparent"></div>
+                <p class="absolute bottom-5 left-5 font-display text-2xl uppercase text-white">{{ $destacado->nombre }}</p>
+            @else
+                <div class="absolute inset-x-0 bottom-0 h-[26%] bg-tomate-oscuro"></div>
+                <div class="absolute inset-x-[12%] bottom-[14%] h-[20%] rounded-md bg-carton"></div>
+                <x-tienda.pizza variante="especial" class="absolute left-1/2 top-[9%] w-[66%] -translate-x-1/2 drop-shadow-xl" />
+            @endif
+            @if ($destacado?->unidades_por_caja)
+                <span class="absolute right-5 top-5 rounded-full bg-queso px-3.5 py-1.5 text-xs font-bold">Caja x {{ $destacado->unidades_por_caja }} unidades</span>
+            @endif
         </div>
     </section>
 
@@ -114,6 +124,7 @@
             <p class="mt-4 max-w-md text-sm leading-relaxed text-white/75">El descuento se aplica solo en el carrito según la cantidad total de cajas del pedido, sin importar la variedad.</p>
 
             @php($niveles = config('tienda.niveles'))
+            @php($descuentos = \App\Models\PriceList::vigente()?->descuentos() ?? [])
             <div class="mt-8 grid gap-4 md:grid-cols-3">
                 <div class="rounded-xl border border-white/10 p-6">
                     <p class="text-xs font-bold uppercase tracking-[0.15em] text-white/75">{{ $niveles['inicial']['nombre'] }}</p>
@@ -124,12 +135,12 @@
                     <span class="absolute right-4 top-4 rounded-full bg-queso px-2.5 py-1 text-[0.65rem] font-bold text-carbon">Más elegido</span>
                     <p class="text-xs font-bold uppercase tracking-[0.15em]">{{ $niveles['comercio']['nombre'] }}</p>
                     <p class="mt-3 font-display text-3xl">{{ $niveles['comercio']['desde'] }} a {{ $niveles['distribuidor']['desde'] - 1 }} cajas</p>
-                    <p class="mt-2 text-sm text-white/85">[−X%] sobre lista</p>
+                    <p class="mt-2 text-sm text-white/85">{{ isset($descuentos['comercio']) ? '−'.$descuentos['comercio'].' % sobre lista' : 'Descuento sobre lista' }}</p>
                 </div>
                 <div class="rounded-xl border border-white/10 p-6">
                     <p class="text-xs font-bold uppercase tracking-[0.15em] text-white/75">{{ $niveles['distribuidor']['nombre'] }}</p>
                     <p class="mt-3 font-display text-3xl">{{ $niveles['distribuidor']['desde'] }} cajas o más</p>
-                    <p class="mt-2 text-sm text-white/75">[−X%] sobre lista + precio por contrato</p>
+                    <p class="mt-2 text-sm text-white/75">{{ isset($descuentos['distribuidor']) ? '−'.$descuentos['distribuidor'].' % sobre lista' : 'Mayor descuento sobre lista' }} + precio por contrato</p>
                 </div>
             </div>
         </div>
@@ -140,7 +151,7 @@
         <h2 class="font-display text-5xl uppercase">Cómo comprar</h2>
         <ol class="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             @foreach ([
-                ['Pedí tu alta', 'Completá el formulario con tu CUIT y te habilitamos la cuenta en [X] horas hábiles.'],
+                ['Pedí tu alta', 'Completá el formulario con tu CUIT y te habilitamos la cuenta'.(config('tienda.alta_horas') ? ' en '.config('tienda.alta_horas').' horas hábiles' : '').'.'],
                 ['Armá el pedido por caja', 'Mezclá variedades libremente. El descuento por volumen se calcula sobre el total.'],
                 ['Confirmá y pagá', 'Transferencia, Mercado Pago o cuenta corriente para clientes aprobados. Factura A o B.'],
                 ['Recibí en tu local', 'Reparto refrigerado en la franja horaria que elijas, o retiro por fábrica.'],
@@ -214,7 +225,7 @@
                     </div>
                 </div>
                 <button type="submit" class="tienda-btn-primario mt-5 w-full">Solicitar alta mayorista</button>
-                <p class="mt-3 text-xs text-tinta">Te contactamos en [X] horas hábiles para validar los datos.</p>
+                <p class="mt-3 text-xs text-tinta">Te contactamos{{ config('tienda.alta_horas') ? ' en '.config('tienda.alta_horas').' horas hábiles' : '' }} para validar los datos.</p>
             </form>
         </div>
     </section>

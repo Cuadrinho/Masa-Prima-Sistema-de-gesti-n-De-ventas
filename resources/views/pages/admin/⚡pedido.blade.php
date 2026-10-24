@@ -187,7 +187,7 @@ new class extends Component {
                                         <p class="text-xs text-tinta">{{ $item->product->codigo }} · {{ $item->product->etiqueta() }} · {{ $item->product->detalle }}</p>
                                     </td>
                                     <td class="px-3 py-3 text-center"><span class="font-display text-2xl">{{ $item->cajas }}</span><span class="block text-xs text-tinta">cajas</span></td>
-                                    <td class="px-3 py-3 text-center text-xs text-tinta">{{ $item->cajas }} × {{ $item->product->unidades_por_caja ?? '[N]' }}<span class="block">unidades</span></td>
+                                    <td class="px-3 py-3 text-center text-xs text-tinta">@if ($item->product->unidades_por_caja){{ $item->cajas }} × {{ $item->product->unidades_por_caja }}<span class="block">unidades</span>@else — @endif</td>
                                     <td class="px-3 py-3">
                                         @if ($item->listo)
                                             <x-admin.badge clases="bg-albahaca-claro text-albahaca">✓ Listo</x-admin.badge>
@@ -197,7 +197,7 @@ new class extends Component {
                                             <x-admin.badge>Por preparar</x-admin.badge>
                                         @endif
                                     </td>
-                                    <td class="px-5 py-3 text-right">{{ Formato::dinero($item->importe(), 'IMPORTE') }}</td>
+                                    <td class="px-5 py-3 text-right">{{ Formato::dinero($item->importe()) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -205,10 +205,10 @@ new class extends Component {
                 </div>
 
                 <dl class="ml-auto mt-4 max-w-xs space-y-1.5 text-sm">
-                    <div class="flex justify-between"><dt>Subtotal de lista</dt><dd class="font-semibold">{{ Formato::dinero($order->subtotal, 'SUBTOTAL') }}</dd></div>
-                    <div class="flex justify-between font-semibold text-albahaca"><dt>Descuento {{ $order->nivel }} ({{ $order->cajas() }} cajas)</dt><dd>− {{ Formato::dinero($order->descuento, 'DESCUENTO') }}</dd></div>
-                    <div class="flex justify-between"><dt>Envío</dt><dd class="font-semibold">{{ $order->esReparto() ? Formato::dinero($order->envio, 'ENVÍO') : 'Sin cargo' }}</dd></div>
-                    <div class="flex justify-between"><dt>IVA</dt><dd class="font-semibold">{{ Formato::dinero($order->iva, 'IVA') }}</dd></div>
+                    <div class="flex justify-between"><dt>Subtotal de lista</dt><dd class="font-semibold">{{ Formato::dinero($order->subtotal) }}</dd></div>
+                    <div class="flex justify-between font-semibold text-albahaca"><dt>Descuento {{ $order->nivel }} ({{ $order->cajas() }} cajas)</dt><dd>− {{ Formato::dinero($order->descuento) }}</dd></div>
+                    <div class="flex justify-between"><dt>Envío</dt><dd class="font-semibold">{{ $order->esReparto() ? Formato::dinero($order->envio) : 'Sin cargo' }}</dd></div>
+                    <div class="flex justify-between"><dt>IVA</dt><dd class="font-semibold">{{ Formato::dinero($order->iva) }}</dd></div>
                     <div class="flex items-end justify-between border-t-2 border-carbon pt-2"><dt>Total</dt><dd class="font-display text-4xl">{{ Formato::dinero($order->total) }}</dd></div>
                 </dl>
             </x-admin.tarjeta>

@@ -38,6 +38,11 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
+    // El mismo default que la columna, para que un usuario recién creado ya tenga rol.
+    protected $attributes = [
+        'rol' => 'cliente',
+    ];
+
     /**
      * Get the attributes that should be cast.
      *
@@ -67,7 +72,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
      */
     public function esPersonal(): bool
     {
-        return $this->rol?->esPersonal() ?? false;
+        return $this->rol->esPersonal();
     }
 
     /**

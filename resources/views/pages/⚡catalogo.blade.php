@@ -1,7 +1,10 @@
 <?php
 
+use App\Models\Order;
+use App\Models\PriceList;
 use App\Models\Product;
 use App\Support\Formato;
+use App\Support\Niveles;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -32,6 +35,8 @@ new #[Layout('layouts::tienda')] #[Title('Catálogo mayorista')] class extends C
     #[Computed]
     public function catalogo(): Collection
     {
+        $precios = PriceList::mapaVigente();
+
         return Product::activos()->get()->mapWithKeys(fn (Product $producto) => [$producto->codigo => [
             'codigo' => $producto->codigo,
             'nombre' => $producto->nombre,
@@ -40,7 +45,9 @@ new #[Layout('layouts::tienda')] #[Title('Catálogo mayorista')] class extends C
             'detalle' => $producto->detalle,
             'ilustracion' => $producto->ilustracion,
             'imagen' => $producto->imagen,
-            'precio' => $producto->precio,
+            'precios' => $precios[$producto->id] ?? [],
+            'con_precio' => $conPrecio = Niveles::completos($precios[$producto->id] ?? []),
+            'pedible' => $producto->se_puede_pedir && $conPrecio,
         ]]);
     }
 
@@ -67,14 +74,31 @@ new #[Layout('layouts::tienda')] #[Title('Catálogo mayorista')] class extends C
     #[Computed]
     public function nivel(): array
     {
-        return collect(config('tienda.niveles'))
-            ->filter(fn ($nivel) => $nivel['desde'] <= $this->cajas)
-            ->last();
+        $clave = Niveles::paraCajas($this->cajas, auth()->user()?->customer?->nivel);
+
+        return [...Niveles::todos()[$clave], 'clave' => $clave];
+    }
+
+    /**
+     * Totales del carrito sin envío, que se define al confirmar.
+     *
+     * @return array{subtotal: float, descuento: float, envio: float, iva: float, total: float}|null
+     */
+    #[Computed]
+    public function totales(): ?array
+    {
+        return Order::calcularTotales(
+            collect($this->carrito)
+                ->filter(fn ($cantidad, $codigo) => $this->catalogo->has($codigo))
+                ->map(fn ($cantidad, $codigo) => ['precios' => $this->catalogo[$codigo]['precios'], 'cajas' => $cantidad]),
+            $this->nivel['clave'],
+            reparto: false,
+        );
     }
 
     public function sumar(string $codigo): void
     {
-        if ($this->producto($codigo) === null) {
+        if (! ($this->producto($codigo)['pedible'] ?? false)) {
             return;
         }
 
@@ -153,7 +177,7 @@ new #[Layout('layouts::tienda')] #[Title('Catálogo mayorista')] class extends C
         <main>
             <nav class="text-xs text-tinta"><a href="{{ route('home') }}" class="underline">Inicio</a> / Catálogo</nav>
             <h1 class="mt-1 font-display text-5xl uppercase">Catálogo mayorista</h1>
-            <p class="mt-2 text-sm text-tinta">Precios por caja, IVA [incluido / no incluido]. Mezclá variedades: el descuento se calcula sobre el total de cajas.</p>
+            <p class="mt-2 text-sm text-tinta">Precios por caja, IVA no incluido. Mezclá variedades: el descuento se calcula sobre el total de cajas.</p>
 
             {{-- Buscador en mobile --}}
             <input wire:model.live.debounce.300ms="buscar" type="search" class="tienda-input mt-4 sm:hidden" placeholder="Buscar por variedad o código">
@@ -190,10 +214,18 @@ new #[Layout('layouts::tienda')] #[Title('Catálogo mayorista')] class extends C
                             <p class="text-[0.65rem] font-semibold text-tinta">{{ $producto['codigo'] }}</p>
                             <h2 class="mt-0.5 font-bold leading-snug">{{ $producto['nombre'] }}</h2>
                             <p class="mt-1 text-xs text-tinta">{{ $producto['detalle'] }}</p>
-                            <p class="mt-3 mb-4"><span class="font-display text-3xl">{{ Formato::dinero($producto['precio'], 'PRECIO') }}</span> <span class="text-xs text-tinta">/ caja</span></p>
+                            @if ($producto['con_precio'])
+                                <p class="mt-3 mb-4"><span class="font-display text-3xl">{{ Formato::dinero($producto['precios'][$this->nivel['clave']]) }}</span> <span class="text-xs text-tinta">/ caja</span></p>
+                            @else
+                                <p class="mt-3 mb-4 text-sm font-semibold text-tinta">Precio a consultar</p>
+                            @endif
 
                             <div class="mt-auto">
-                                @if ($cantidad > 0)
+                                @if (! $producto['con_precio'])
+                                    <button type="button" disabled class="tienda-btn-borde w-full cursor-not-allowed !py-2.5 opacity-60">Todavía no se puede pedir</button>
+                                @elseif (! $producto['pedible'])
+                                    <button type="button" disabled class="tienda-btn-borde w-full cursor-not-allowed !py-2.5 opacity-60">Sin stock para pedir</button>
+                                @elseif ($cantidad > 0)
                                     <div class="flex items-center overflow-hidden rounded-md border-[1.5px] border-carbon">
                                         <button type="button" wire:click="restar('{{ $producto['codigo'] }}')" class="px-4 py-2.5 text-lg font-bold hover:bg-harina" aria-label="Quitar una caja">−</button>
                                         <span class="flex-1 text-center text-sm font-semibold">{{ $cantidad }} {{ $cantidad === 1 ? 'caja' : 'cajas' }}</span>
@@ -241,7 +273,7 @@ new #[Layout('layouts::tienda')] #[Title('Catálogo mayorista')] class extends C
                         <li wire:key="carrito-{{ $codigo }}" class="flex items-start justify-between gap-3 py-3">
                             <div>
                                 <p class="text-sm font-semibold">{{ $producto['nombre'] }}</p>
-                                <p class="text-xs text-tinta">{{ $cantidad }} {{ $cantidad === 1 ? 'caja' : 'cajas' }} × {{ Formato::dinero($producto['precio'], 'PRECIO') }}</p>
+                                <p class="text-xs text-tinta">{{ $cantidad }} {{ $cantidad === 1 ? 'caja' : 'cajas' }} × {{ Formato::dinero($producto['precios'][$this->nivel['clave']] ?? null) }}</p>
                             </div>
                             <button type="button" wire:click="quitar('{{ $codigo }}')" class="p-1 text-tinta hover:text-tomate" aria-label="Quitar {{ $producto['nombre'] }}">
                                 <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
@@ -253,13 +285,14 @@ new #[Layout('layouts::tienda')] #[Title('Catálogo mayorista')] class extends C
                 </ul>
 
                 <dl class="space-y-1.5 border-t border-linea pt-3 text-sm">
-                    <div class="flex justify-between"><dt>Subtotal de lista</dt><dd>$ [SUBTOTAL]</dd></div>
-                    <div class="flex justify-between font-semibold text-albahaca"><dt>Descuento por volumen</dt><dd>− $ [DESCUENTO]</dd></div>
-                    <div class="flex justify-between"><dt>Envío</dt><dd>[A calcular]</dd></div>
+                    <div class="flex justify-between"><dt>Subtotal de lista</dt><dd>{{ Formato::dinero($this->totales['subtotal'] ?? null) }}</dd></div>
+                    <div class="flex justify-between font-semibold text-albahaca"><dt>Descuento por volumen</dt><dd>− {{ Formato::dinero($this->totales['descuento'] ?? null) }}</dd></div>
+                    <div class="flex justify-between"><dt>IVA ({{ config('tienda.iva') * 100 }} %)</dt><dd>{{ Formato::dinero($this->totales['iva'] ?? null) }}</dd></div>
+                    <div class="flex justify-between"><dt>Envío</dt><dd>{{ config('tienda.envio') ? 'Se calcula al confirmar' : 'Sin cargo' }}</dd></div>
                 </dl>
                 <div class="mt-3 flex items-end justify-between border-t-2 border-carbon pt-3">
                     <span class="text-sm font-bold">Total</span>
-                    <span class="font-display text-3xl">$ [TOTAL]</span>
+                    <span class="font-display text-3xl">{{ Formato::dinero($this->totales['total'] ?? null) }}</span>
                 </div>
 
                 <button

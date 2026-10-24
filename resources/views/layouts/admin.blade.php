@@ -19,8 +19,8 @@
         ['Entregas', route('admin.entregas'), request()->routeIs('admin.entregas'), $contadores['entregas'], 'M3 6h11v10H3zM14 10h4l3 3v3h-7M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4M17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4'],
         ['Cobranzas', route('admin.entregas').'#cobranzas', false, null, 'M3 6h18v12H3zM3 10h18M7 15h4'],
         ['Finalizados', route('admin.finalizados'), request()->routeIs('admin.finalizados'), null, 'm5 12 5 5L20 7'],
-        ['Clientes', null, false, null, 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4 20a8 8 0 0 1 16 0'],
-        ['Catálogo y precios', null, false, null, 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'],
+        ['Clientes', route('admin.clientes'), request()->routeIs('admin.clientes', 'admin.cliente'), null, 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4 20a8 8 0 0 1 16 0'],
+        ['Catálogo y precios', route('admin.precios'), request()->routeIs('admin.precios', 'admin.producto', 'admin.producto.nuevo'), null, 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'],
     ];
 
     $usuario = auth()->user();

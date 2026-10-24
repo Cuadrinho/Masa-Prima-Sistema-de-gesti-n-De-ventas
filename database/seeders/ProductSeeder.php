@@ -25,7 +25,7 @@ class ProductSeeder extends Seeder
                 'nombre' => $nombre,
                 'nombre_corto' => $corto,
                 'categoria' => 'pizzas',
-                'detalle' => 'Caja x [N] unid. · [TAMAÑO] cm',
+                'detalle' => null,
                 'ilustracion' => $ilustracion,
                 'imagen' => 'images/productos/'.$foto,
                 'orden' => $orden + 1,

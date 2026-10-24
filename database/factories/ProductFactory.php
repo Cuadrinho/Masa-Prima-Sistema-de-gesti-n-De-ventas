@@ -15,14 +15,14 @@ class ProductFactory extends Factory
      */
     public function definition(): array
     {
-        $nombre = fake()->unique()->words(2, true);
+        $palabra = fake()->word();
 
         return [
             'codigo' => strtoupper(fake()->unique()->bothify('??-##')),
-            'nombre' => ucfirst($nombre),
-            'nombre_corto' => ucfirst(strtok($nombre, ' ')),
+            'nombre' => ucfirst($palabra.' '.fake()->word()),
+            'nombre_corto' => ucfirst($palabra),
             'categoria' => fake()->randomElement(['prepizzas', 'precocidas', 'congeladas', 'masas']),
-            'detalle' => 'Caja x [N] unid. · [TAMAÑO] cm',
+            'detalle' => null,
             'ilustracion' => 'prepizza',
             'activo' => true,
             'orden' => 0,

@@ -20,7 +20,15 @@ enum EstadoPedido: string
      */
     public static function circuito(): array
     {
-        return array_values(array_filter(self::cases(), fn (self $estado) => $estado !== self::Rechazado));
+        $circuito = [];
+
+        foreach (self::cases() as $estado) {
+            if ($estado !== self::Rechazado) {
+                $circuito[] = $estado;
+            }
+        }
+
+        return $circuito;
     }
 
     /**

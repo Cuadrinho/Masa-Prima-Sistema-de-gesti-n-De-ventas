@@ -21,6 +21,11 @@ Route::middleware(['auth', 'personal'])->prefix('admin')->name('admin.')->group(
     Route::livewire('cocina', 'pages::admin.cocina')->name('cocina');
     Route::livewire('entregas', 'pages::admin.entregas')->name('entregas');
     Route::livewire('finalizados', 'pages::admin.finalizados')->name('finalizados');
+    Route::livewire('clientes', 'pages::admin.clientes')->name('clientes');
+    Route::livewire('clientes/{customer}', 'pages::admin.cliente')->name('cliente');
+    Route::livewire('catalogo', 'pages::admin.precios')->name('precios');
+    Route::livewire('catalogo/nuevo', 'pages::admin.producto')->name('producto.nuevo');
+    Route::livewire('catalogo/{product:codigo}', 'pages::admin.producto')->name('producto');
 });
 
 require __DIR__.'/settings.php';

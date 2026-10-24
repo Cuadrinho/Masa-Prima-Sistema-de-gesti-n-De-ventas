@@ -179,7 +179,7 @@ new #[Layout('layouts::admin', ['migas' => ['Finalizados']])] #[Title('Pedidos f
             <div class="rounded-2xl bg-carbon p-5 text-white">
                 <p class="text-[0.65rem] font-bold uppercase tracking-[0.15em] text-white/75">Cerrado en el período</p>
                 <p class="mt-2 font-display text-5xl">{{ $this->resumen['cajas'] }} cajas</p>
-                <p class="text-xs text-white/75">{{ $this->resumen['pedidos'] }} pedidos · {{ Formato::dinero($this->resumen['facturado'], 'FACTURADO') }}</p>
+                <p class="text-xs text-white/75">{{ $this->resumen['pedidos'] }} pedidos · {{ Formato::dinero($this->resumen['facturado']) }}</p>
             </div>
 
             <x-admin.tarjeta titulo="Gustos más vendidos">

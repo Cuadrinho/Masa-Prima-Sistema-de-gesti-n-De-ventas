@@ -15,26 +15,42 @@
                 </ul>
             </div>
 
-            <div class="text-sm">
-                <p class="font-bold text-white">Contacto</p>
-                <ul class="mt-3 space-y-2">
-                    <li>WhatsApp [11 6912-7499]</li>
-                    <li>[masaprima@gmail.com]</li>
-                    <li>[Isidro Casanova 1234]</li>
-                </ul>
-            </div>
+            @php($empresa = config('tienda.empresa'))
+            @if ($empresa['whatsapp'] || $empresa['email'] || $empresa['direccion'])
+                <div class="text-sm">
+                    <p class="font-bold text-white">Contacto</p>
+                    <ul class="mt-3 space-y-2">
+                        @if ($empresa['whatsapp'])
+                            <li><a href="https://wa.me/{{ preg_replace('/\D/', '', $empresa['whatsapp']) }}" target="_blank" rel="noopener" class="underline underline-offset-2 hover:text-white">WhatsApp {{ $empresa['whatsapp'] }}</a></li>
+                        @endif
+                        @if ($empresa['email'])
+                            <li><a href="mailto:{{ $empresa['email'] }}" class="underline underline-offset-2 hover:text-white">{{ $empresa['email'] }}</a></li>
+                        @endif
+                        @if ($empresa['direccion'])
+                            <li>{{ $empresa['direccion'] }}</li>
+                        @endif
+                    </ul>
+                </div>
+            @endif
 
-            <div class="text-sm">
-                <p class="font-bold text-white">Horario de pedidos</p>
-                <ul class="mt-3 space-y-2">
-                    <li>Mar a Vie [8:00 - 17:00]</li>
-                    <li>Sábados [8:00 - 13:00]</li>
-                </ul>
-            </div>
+            @if (config('tienda.horarios'))
+                <div class="text-sm">
+                    <p class="font-bold text-white">Horario de pedidos</p>
+                    <ul class="mt-3 space-y-2">
+                        @foreach (config('tienda.horarios') as $dias => $horario)
+                            <li>{{ $dias }} {{ $horario }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
         </div>
 
         <div class="mt-10 border-t border-white/10 pt-6 text-xs">
-            © {{ date('Y') }} {{ config('tienda.nombre') }} · [RAZÓN SOCIAL] · CUIT [CUIT]
+            {{ collect([
+                '© '.date('Y').' '.config('tienda.nombre'),
+                $empresa['razon_social'],
+                $empresa['cuit'] ? 'CUIT '.$empresa['cuit'] : null,
+            ])->filter()->implode(' · ') }}
         </div>
     </div>
 </footer>

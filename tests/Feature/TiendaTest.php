@@ -3,12 +3,18 @@
 use App\Enums\EstadoPedido;
 use App\Models\Customer;
 use App\Models\Order;
+use App\Models\PriceList;
+use App\Models\Product;
 use App\Models\User;
+use App\Support\Niveles;
 use Database\Seeders\ProductSeeder;
 use Livewire\Livewire;
 
 beforeEach(function () {
     $this->seed(ProductSeeder::class);
+
+    $lista = PriceList::create(['numero' => 1, 'vigente_desde' => today(), 'publicada_at' => now()]);
+    Product::each(fn (Product $producto) => collect(Niveles::claves())->each(fn (string $nivel) => $lista->fijar($producto, $nivel, 10000)));
 });
 
 test('la home se muestra', function () {
@@ -17,6 +23,16 @@ test('la home se muestra', function () {
         ->assertSee(config('tienda.nombre'))
         ->assertSee('Pizzas prelistas, listas para tu horno.');
 });
+
+test('las páginas de la tienda no muestran textos de relleno', function (string $ruta) {
+    $this->actingAs(User::factory()->create());
+    session(['carrito' => ['PZ-01' => 5]]);
+
+    $html = $this->get(route($ruta))->assertOk()->getContent();
+    $texto = strip_tags(preg_replace('#<(script|style)\b.*?</\1>#is', '', $html));
+
+    expect($texto)->not->toMatch('/\[[^\]\n]{1,40}\]/u');
+})->with(['home', 'catalogo', 'pedido']);
 
 test('el catálogo lista las pizzas con foto y permite buscar', function () {
     $this->get(route('catalogo'))
@@ -101,6 +117,68 @@ test('el primer pedido crea el comercio de la cuenta', function () {
         ->and($order->customer->user_id)->toBe($user->id)
         ->and($order->events)->toHaveCount(1)
         ->and(session('carrito'))->toBeNull();
+});
+
+test('el pedido guarda subtotal, descuento del nivel, IVA y total', function () {
+    $lista = PriceList::vigente();
+    $lista->fijar(Product::firstWhere('codigo', 'PZ-01'), 'inicial', 10000);
+    $lista->fijar(Product::firstWhere('codigo', 'PZ-01'), 'comercio', 9000);
+    $lista->fijar(Product::firstWhere('codigo', 'PZ-03'), 'inicial', 12000);
+    $lista->fijar(Product::firstWhere('codigo', 'PZ-03'), 'comercio', 10800);
+
+    $this->actingAs(User::factory()->create());
+    session(['carrito' => ['PZ-01' => 4, 'PZ-03' => 8]]);
+
+    Livewire::test('pages::pedido')
+        ->assertSee('$ 136.000')
+        ->assertSee('$ 148.104')
+        ->set('razonSocial', 'Pizzería Nueva')
+        ->set('cuit', '20-12345678-6')
+        ->set('direccion', 'Av. Siempreviva 742')
+        ->call('confirmar')
+        ->assertHasNoErrors();
+
+    $order = Order::with('items')->sole();
+
+    expect($order->subtotal)->toBe('136000.00')
+        ->and($order->descuento)->toBe('13600.00')
+        ->and($order->envio)->toBe('0.00')
+        ->and($order->iva)->toBe('25704.00')
+        ->and($order->total)->toBe('148104.00')
+        ->and($order->items->sum(fn ($item) => $item->importe()))->toEqual(122400);
+});
+
+test('un producto sin precio en todos los niveles no se puede sumar al carrito', function () {
+    PriceList::vigente()->fijar(Product::firstWhere('codigo', 'PZ-02'), 'distribuidor', null);
+
+    Livewire::test('pages::catalogo')
+        ->assertSee('Precio a consultar')
+        ->call('sumar', 'PZ-02')
+        ->assertSet('carrito', []);
+});
+
+test('no se puede confirmar un pedido con productos sin precio', function () {
+    PriceList::vigente()->fijar(Product::firstWhere('codigo', 'PZ-02'), 'comercio', null);
+
+    $this->actingAs(User::factory()->create());
+    session(['carrito' => ['PZ-01' => 4, 'PZ-02' => 2]]);
+
+    Livewire::test('pages::pedido')
+        ->assertSee('Todavía no tenemos precio para Pizza Jamón y Morrón')
+        ->set('razonSocial', 'Pizzería Nueva')
+        ->set('cuit', '20-12345678-6')
+        ->set('direccion', 'Av. Siempreviva 742')
+        ->call('confirmar')
+        ->assertHasErrors('carrito');
+
+    expect(Order::count())->toBe(0)
+        ->and(Customer::count())->toBe(0);
+});
+
+test('sin precio para algún producto no hay totales', function () {
+    expect(Order::calcularTotales([['precios' => ['inicial' => '1000'], 'cajas' => 10]], 'comercio', true))->toBeNull()
+        ->and(Order::calcularTotales([['precios' => ['inicial' => '1000.00'], 'cajas' => 3]], 'inicial', false))
+        ->toBe(['subtotal' => 3000.0, 'descuento' => 0.0, 'envio' => 0.0, 'iva' => 630.0, 'total' => 3630.0]);
 });
 
 test('los pedidos siguientes usan el comercio de la cuenta', function () {

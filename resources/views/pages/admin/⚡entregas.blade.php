@@ -79,8 +79,8 @@ new #[Layout('layouts::admin', ['migas' => ['Entregas', 'Hoy']])] #[Title('Entre
     <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <x-admin.kpi titulo="Por entregar hoy" :valor="$pendientes->count()" :detalle="$enCamino.' en camino · '.($pendientes->count() - $enCamino).' en planta'" />
         <x-admin.kpi titulo="Entregados hoy" :valor="$entregadosHoy->count()" :detalle="$entregadosHoy->sum(fn ($order) => $order->cajas()).' cajas'" />
-        <x-admin.kpi titulo="Por cobrar" :valor="Formato::dinero($sumar($this->porCobrar), 'MONTO')" :detalle="$this->porCobrar->count().' pedidos · '.$vencidos.' '.($vencidos === 1 ? 'vencido' : 'vencidos')" destacado />
-        <x-admin.kpi titulo="Cobrado hoy" :valor="Formato::dinero($sumar($this->cobradoHoy), 'MONTO')" :detalle="$this->cobradoHoy->count().' '.($this->cobradoHoy->count() === 1 ? 'pago registrado' : 'pagos registrados')" />
+        <x-admin.kpi titulo="Por cobrar" :valor="Formato::dinero($sumar($this->porCobrar))" :detalle="$this->porCobrar->count().' pedidos · '.$vencidos.' '.($vencidos === 1 ? 'vencido' : 'vencidos')" destacado />
+        <x-admin.kpi titulo="Cobrado hoy" :valor="Formato::dinero($sumar($this->cobradoHoy))" :detalle="$this->cobradoHoy->count().' '.($this->cobradoHoy->count() === 1 ? 'pago registrado' : 'pagos registrados')" />
     </div>
 
     <div class="mt-4 grid gap-4 xl:grid-cols-[1fr_1.15fr]">
@@ -162,7 +162,7 @@ new #[Layout('layouts::admin', ['migas' => ['Entregas', 'Hoy']])] #[Title('Entre
                                         <x-admin.badge :clases="$clases">{{ $texto }}</x-admin.badge>
                                     @endif
                                 </td>
-                                <td class="px-3 py-3 text-right font-semibold">{{ Formato::dinero($order->total, 'IMPORTE') }}</td>
+                                <td class="px-3 py-3 text-right font-semibold">{{ Formato::dinero($order->total) }}</td>
                                 <td class="py-3 pr-5 text-right">
                                     @if ($cobranzas !== 'pagados' && $order->estado !== EstadoPedido::Solicitud && $order->metodo_pago !== MetodoPago::CuentaCorriente)
                                         <button type="button" wire:click="registrarPago({{ $order->id }})" class="tienda-btn-oscuro !px-3 !py-2 !text-xs">Registrar pago</button>

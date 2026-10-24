@@ -6,6 +6,7 @@ use App\Enums\EstadoPedido;
 use App\Enums\Franja;
 use App\Enums\MetodoPago;
 use App\Support\Formato;
+use App\Support\Niveles;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -113,13 +114,46 @@ class Order extends Model
     }
 
     /**
-     * Nombre del nivel de precio que corresponde a una cantidad de cajas.
+     * Nombre del nivel de precio que corresponde a una cantidad de cajas,
+     * o al nivel asignado al cliente si es más alto.
      */
-    public static function nivelPara(int $cajas): string
+    public static function nivelPara(int $cajas, ?Customer $cliente = null): string
     {
-        return collect(config('tienda.niveles'))
-            ->filter(fn (array $nivel) => $nivel['desde'] <= $cajas)
-            ->last()['nombre'];
+        return Niveles::nombre(Niveles::paraCajas($cajas, $cliente?->nivel));
+    }
+
+    /**
+     * Totales de un pedido: subtotal a precio del primer nivel, descuento por el
+     * nivel aplicado, envío e IVA aparte. Null si a alguna línea le falta precio.
+     *
+     * @param  iterable<array{precios: array<string, string>, cajas: int}>  $lineas  precios por clave de nivel
+     * @return array{subtotal: float, descuento: float, envio: float, iva: float, total: float}|null
+     */
+    public static function calcularTotales(iterable $lineas, string $nivel, bool $reparto): ?array
+    {
+        $base = Niveles::claves()[0];
+        $subtotal = 0.0;
+        $conDescuento = 0.0;
+
+        foreach ($lineas as $linea) {
+            if (! isset($linea['precios'][$base], $linea['precios'][$nivel])) {
+                return null;
+            }
+
+            $subtotal += (float) $linea['precios'][$base] * $linea['cajas'];
+            $conDescuento += (float) $linea['precios'][$nivel] * $linea['cajas'];
+        }
+
+        $envio = $reparto ? (float) config('tienda.envio') : 0.0;
+        $iva = round(($conDescuento + $envio) * config('tienda.iva'), 2);
+
+        return [
+            'subtotal' => round($subtotal, 2),
+            'descuento' => round($subtotal - $conDescuento, 2),
+            'envio' => $envio,
+            'iva' => $iva,
+            'total' => round($conDescuento + $envio + $iva, 2),
+        ];
     }
 
     /**
@@ -222,7 +256,7 @@ class Order extends Model
     public function vencimiento(): ?CarbonImmutable
     {
         if ($this->metodo_pago === MetodoPago::CuentaCorriente) {
-            $dias = $this->customer->cuenta_corriente_dias ?? 30;
+            $dias = $this->customer->cuenta_corriente_dias ?? config('tienda.cuenta_corriente_dias');
 
             return ($this->entregado_at ?? $this->entrega_fecha)->startOfDay()->addDays($dias);
         }
@@ -249,7 +283,7 @@ class Order extends Model
     {
         return match (true) {
             $this->estaPagado() => ['Pagado', 'bg-albahaca-claro text-albahaca'],
-            $this->metodo_pago === MetodoPago::CuentaCorriente => ['Cta. cte. · '.($this->customer->cuenta_corriente_dias ?? 30).' d', 'bg-queso-claro text-carbon'],
+            $this->metodo_pago === MetodoPago::CuentaCorriente => ['Cta. cte. · '.($this->customer->cuenta_corriente_dias ?? config('tienda.cuenta_corriente_dias')).' d', 'bg-queso-claro text-carbon'],
             default => ['Por pagar', 'border border-tomate bg-white text-tomate'],
         };
     }
